@@ -143,8 +143,16 @@
                   >复制</el-button>
                 </el-input>
               </el-form-item>
-
               <el-form-item label-width="0px" style="margin-top: 40px; text-align: center">
+                <el-button
+                  style="width: 250px"
+                  type="danger"
+                  @click="saveAndMakeUrl"
+                  :disabled="form.sourceSubUrl.length === 0"
+                >保存并生成固定订阅链接</el-button>
+                <!-- <el-button style="width: 120px" type="primary" @click="surgeInstall" icon="el-icon-connection">一键导入Surge</el-button> -->
+              </el-form-item>
+              <el-form-item label-width="0px" style="margin-top: 10px; text-align: center">
                 <el-button
                   style="width: 120px"
                   type="danger"
@@ -224,6 +232,7 @@
 const project = process.env.VUE_APP_PROJECT
 const remoteConfigSample = process.env.VUE_APP_SUBCONVERTER_REMOTE_CONFIG
 const gayhubRelease = process.env.VUE_APP_BACKEND_RELEASE
+const defaultBackendSubUrl = process.env.VUE_APP_SUBCONVERTER_DEFAULT_BACKEND + '/suburl?'
 const defaultBackend = process.env.VUE_APP_SUBCONVERTER_DEFAULT_BACKEND + '/sub?'
 const shortUrlBackend = process.env.VUE_APP_MYURLS_DEFAULT_BACKEND + '/short'
 const configUploadBackend = process.env.VUE_APP_CONFIG_UPLOAD_BACKEND + '/config/upload'
@@ -424,6 +433,120 @@ export default {
 
       const url = "surge://install-config?url=";
       window.open(url + this.customSubUrl);
+    },
+    saveUrl() {
+      if (this.form.sourceSubUrl === "") {
+        this.$message.error("订阅链接为必填项");
+        return false;
+      }
+
+      let backend =
+        this.form.customBackend === ""
+          ? defaultBackendSubUrl
+          : this.form.customBackend;
+
+      let sourceSub = this.form.sourceSubUrl;
+      sourceSub = sourceSub.replace(/(\n|\r|\n\r)/g, "|");
+
+      this.customSubUrl =
+        backend +
+        "value=" +
+        encodeURIComponent(sourceSub);
+      this.$axios
+        .post(this.customSubUrl, {}, {
+          header: {
+            "Content-Type": "application/form-data; charset=utf-8"
+          }
+        })
+        .then(res => {
+          if (res.data  === "ok") {
+            this.$message.success("订阅已保存至你的转换服务器");
+          } else {
+            this.$message.error("订阅保存失败:" + res.data.Message);
+          }
+        })
+        .catch(() => {
+          this.$message.error("订阅保存失败");
+        })
+        .finally(() => {
+          this.loading = false;
+        });
+    },
+    saveAndMakeUrl() {
+      if (this.form.sourceSubUrl === "" || this.form.clientType === "") {
+        this.$message.error("订阅链接与客户端为必填项");
+        return false;
+      }
+      this.saveUrl();
+
+      let backend =
+        this.form.customBackend === ""
+          ? defaultBackend
+          : this.form.customBackend;
+
+      this.customSubUrl =
+        backend +
+        "target=" +
+        this.form.clientType +
+        "&url=suburl" +
+        "&insert=" +
+        this.form.insert;
+
+      if (this.advanced === "2") {
+        if (this.form.remoteConfig !== "") {
+          this.customSubUrl +=
+            "&config=" + encodeURIComponent(this.form.remoteConfig);
+        }
+        if (this.form.excludeRemarks !== "") {
+          this.customSubUrl +=
+            "&exclude=" + encodeURIComponent(this.form.excludeRemarks);
+        }
+        if (this.form.includeRemarks !== "") {
+          this.customSubUrl +=
+            "&include=" + encodeURIComponent(this.form.includeRemarks);
+        }
+        if (this.form.filename !== "") {
+          this.customSubUrl +=
+            "&filename=" + encodeURIComponent(this.form.filename);
+        }
+        if (this.form.appendType) {
+          this.customSubUrl +=
+            "&append_type=" + this.form.appendType.toString();
+        }
+
+        this.customSubUrl +=
+          "&emoji=" +
+          this.form.emoji.toString() +
+          "&list=" +
+          this.form.nodeList.toString() +
+          "&tfo=" +
+          this.form.tfo.toString() +
+          "&scv=" +
+          this.form.scv.toString() +
+          "&fdn=" +
+          this.form.fdn.toString() +
+          "&sort=" +
+          this.form.sort.toString();
+
+        if (this.needUdp) {
+          this.customSubUrl += "&udp=" + this.form.udp.toString()
+        }
+
+        if (this.form.tpl.surge.doh === true) {
+          this.customSubUrl += "&surge.doh=true";
+        }
+
+        if (this.form.clientType === "clash") {
+          if (this.form.tpl.clash.doh === true) {
+            this.customSubUrl += "&clash.doh=true";
+          }
+
+          this.customSubUrl += "&new_name=" + this.form.new_name.toString();
+        }
+      }
+
+      this.$copyText(this.customSubUrl);
+      this.$message.success("定制订阅已复制到剪贴板");
     },
     makeUrl() {
       if (this.form.sourceSubUrl === "" || this.form.clientType === "") {
